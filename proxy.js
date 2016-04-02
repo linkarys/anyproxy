@@ -7,7 +7,6 @@ var http = require('http'),
     fs              = require('fs'),
     async           = require("async"),
     url             = require('url'),
-    program         = require('commander'),
     color           = require('colorful'),
     certMgr         = require("./lib/certMgr"),
     getPort         = require("./lib/getPort"),
@@ -25,6 +24,7 @@ var http = require('http'),
     ip              = require("ip"),
     ThrottleGroup   = require("stream-throttle").ThrottleGroup,
     iconv           = require('iconv-lite'),
+    exec            = require('child_process').exec;
     Buffer          = require('buffer').Buffer;
 
 var T_TYPE_HTTP            = 0,
@@ -69,8 +69,6 @@ function proxyServer(option){
         logUtil.setPrintStatus(false);
     }
 
-
-
     if(!!option.interceptHttps){
         default_rule.setInterceptFlag(true);
 
@@ -86,7 +84,8 @@ function proxyServer(option){
         GLOBAL._throttle = new ThrottleGroup({rate: 1024 * parseInt(option.throttle) }); // rate - byte/sec
     }
 
-    requestHandler.setRules(proxyRules); //TODO : optimize calling for set rule
+    requestHandler.watchRulechange(option.rule); //TODO : optimize calling for set rule
+    // requestHandler.setRules(proxyRules); //TODO : optimize calling for set rule
     self.httpProxyServer = null;
 
     async.series(
@@ -141,6 +140,22 @@ function proxyServer(option){
                 callback(null);
             },
 
+            // start weinre
+            function(callback) {
+
+                if (option.weinre) {
+
+                    exec('weinre --boundHost -all-');
+
+                    self.weinreScript = '<script src="http://' + ip.address() + ':8080/target/target-script-min.js#anyproxy"></script>'
+
+                    logUtil.printLog(color.yellow('Weinre server: http://' + ip.address() + ':8080/client/#anyproxy'));
+                    logUtil.printLog('Help script: ' + color.blue('curl -s http://' + ip.address() + ':9000/node.bash | bash -s'));
+                }
+
+                callback(null);
+            },
+
             //start web interface
             function(callback){
                 if(disableWebInterface){
@@ -158,11 +173,27 @@ function proxyServer(option){
                 callback(null);
             },
 
+            function(callback) {
+                option.isSystemProxy && exec('networksetup -setwebproxy Wi-Fi ' + ip.address() + ' 8001');
+
+                callback(null);
+            },
+
             //server status manager
             function(callback){
 
+                var unBindProxy = function() {
+                   option.isSystemProxy && exec('networksetup -setwebproxystate Wi-Fi off');
+                }
+
                 process.on("exit",function(code){
+                    unBindProxy();
                     logUtil.printLog('AnyProxy is about to exit with code: ' + code, logUtil.T_ERR);
+                    process.exit();
+                });
+
+                //catches ctrl+c event
+                process.on("SIGINT", function() {
                     process.exit();
                 });
 

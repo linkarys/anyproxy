@@ -22,6 +22,8 @@ program
     .option('-i, --intercept', 'intercept(decrypt) https requests when root CA exists')
     .option('-s, --silent', 'do not print anything into terminal')
     .option('-c, --clear', 'clear all the tmp certificates')
+    .option('-e, --weinre', 'inject weinre script')
+    .option('-m, --system', 'use as system proxy')
     .option('install', '[alpha] install node modules')
     .parse(process.argv);
 
@@ -47,40 +49,41 @@ if(program.clear){
     });
 }else{
     var proxy = require("./proxy.js");
-    var ruleModule;
 
     if(program.silent){
         logUtil.setPrintStatus(false);
     }
 
-    if(program.rule){
-        var ruleFilePath = path.resolve(process.cwd(),program.rule);
-        try{
-            if(fs.existsSync(ruleFilePath)){
-                ruleModule = require(ruleFilePath);
-                logUtil.printLog("rule file loaded :" + ruleFilePath);
-            }else{
-                var logText = color.red("can not find rule file at " + ruleFilePath);
-                logUtil.printLog(logText, logUtil.T_ERR);
-            }
-        }catch(e){
-            logUtil.printLog("failed to load rule file :" + e.toString(), logUtil.T_ERR);
-        }
-    }else{
-        //a feature for donghua.yan 
-        //read rule file from a specific position
-        (function(){
-            try{
-                var anyproxyHome = path.join(util.getAnyProxyHome());
-                if(fs.existsSync(path.join(anyproxyHome,"rule_default.js"))){
-                    ruleModule = require(path.join(anyproxyHome,"rule_default"));
-                }
-                if(fs.existsSync(path.join(process.cwd(),'rule.js'))){
-                    ruleModule = require(path.join(process.cwd(),'rule'));
-                }
-            }catch(e){}
-        })();
-    }
+    // if(program.rule){
+    //     var ruleFilePath = path.resolve(process.cwd(),program.rule);
+    //     try{
+    //         if(fs.existsSync(ruleFilePath)){
+    //             ruleModule = require(ruleFilePath);
+    //             logUtil.printLog("rule file loaded :" + ruleFilePath);
+    //         }else{
+    //             var logText = color.red("can not find rule file at " + ruleFilePath);
+    //             logUtil.printLog(logText, logUtil.T_ERR);
+    //         }
+    //     }catch(e){
+    //         logUtil.printLog("failed to load rule file :" + e.toString(), logUtil.T_ERR);
+    //     }
+    // }else{
+    //     //a feature for donghua.yan
+    //     //read rule file from a specific position
+    //     (function(){
+    //         try{
+    //             var anyproxyHome = path.join(util.getAnyProxyHome());
+    //             if(fs.existsSync(path.join(anyproxyHome,"rule_default.js"))){
+    //                 ruleModule = require(path.join(anyproxyHome,"rule_default"));
+    //             }
+    //             if(fs.existsSync(path.join(process.cwd(),'rule.js'))){
+    //                 ruleModule = require(path.join(process.cwd(),'rule'));
+    //             }
+    //         }catch(err){
+    //             console.log(err);
+    //         }
+    //     })();
+    // }
 
     new proxy.proxyServer({
         type                : program.type,
@@ -89,7 +92,10 @@ if(program.clear){
         dbFile              : program.file,
         throttle            : program.throttle,
         webPort             : program.web,
-        rule                : ruleModule,
+        // rule                : ruleModule,
+        rule                : program.rule,
+        isSystemProxy       : program.system,
+        weinre              : program.weinre,
         disableWebInterface : false,
         interceptHttps      : program.intercept,
         silent              : program.silent
