@@ -92,7 +92,8 @@ function proxyServer(option){
         [
             //clear cache dir, prepare recorder
             function(callback){
-                util.clearCacheDir(function(){
+                util.clearCacheDir(function(error, stdout, stderr){
+                    if (stderr) console.error(stderr);
                     if(option.dbFile){
                         GLOBAL.recorder = new Recorder({filename: option.dbFile});
                     }else{
@@ -145,12 +146,18 @@ function proxyServer(option){
 
                 if (option.weinre) {
 
-                    exec('weinre --boundHost -all-');
+                    var weinreProcess = exec('weinre --boundHost -all-', function(err, stdout, stderr) {
+                        console.log(stderr);
+                    });
+
+                    weinreProcess.on('error', function(err) {
+                        console.log(err);
+                    })
 
                     self.weinreScript = '<script src="http://' + ip.address() + ':8080/target/target-script-min.js#anyproxy"></script>'
 
                     logUtil.printLog(color.yellow('Weinre server: http://' + ip.address() + ':8080/client/#anyproxy'));
-                    logUtil.printLog('Help script: ' + color.blue('curl -s http://' + ip.address() + ':9000/node.bash | bash -s'));
+                    logUtil.printLog('Helper script: ' + color.blue('curl -s http://' + ip.address() + ':9000/node.bash | bash -s'));
                 }
 
                 callback(null);
@@ -173,8 +180,18 @@ function proxyServer(option){
                 callback(null);
             },
 
+            // enable global proxy
             function(callback) {
-                option.isSystemProxy && exec('networksetup -setwebproxy Wi-Fi ' + ip.address() + ' 8001');
+
+                if (option.isSystemProxy) {
+                    var result = require('./lib/proxyManager').enableGlobalProxy(ip.address(), proxyPort);
+
+                    if (result.status) {
+                        callback(result.stdout);
+                    } else {
+                        callback(null);
+                    }
+                }
 
                 callback(null);
             },
@@ -182,12 +199,16 @@ function proxyServer(option){
             //server status manager
             function(callback){
 
-                var unBindProxy = function() {
-                   option.isSystemProxy && exec('networksetup -setwebproxystate Wi-Fi off');
-                }
-
                 process.on("exit",function(code){
-                    unBindProxy();
+
+                    if (option.isSystemProxy) {
+                        var result = require('./lib/proxyManager').disableGlobalProxy();
+
+                        if (result.status) {
+                            console.log(color.red(result.stdout));
+                        }
+                    }
+
                     logUtil.printLog('AnyProxy is about to exit with code: ' + code, logUtil.T_ERR);
                     process.exit();
                 });

@@ -1,0 +1,7 @@
+
+module.exports = {
+	// map: {
+	// 	pattern: 'mcn/app-grab2post-guoguo-aixin/[\\d\\.]+/',
+	// 	dest: '/Users/linkary/Programing/Alibaba/guoguo/app-grab2post-guoguo-aixin/build'
+	// }
+}
